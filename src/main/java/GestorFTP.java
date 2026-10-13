@@ -51,6 +51,9 @@ public class GestorFTP {
                     "\n1. Listar archivos y carpetas." +
                     "\n2. Subir un archivo." +
                     "\n3. Descargar un archivo." +
+                    "\n4. Crear una carpeta." +
+                    "\n5. Cambiar de carpeta." +
+                    "\n6. Volver a la carpeta superior." +
                     "\n0. Salir."
             );
             System.out.print("Opción: ");
@@ -62,6 +65,9 @@ public class GestorFTP {
                     case "1" -> listar();
                     case "2" -> subirArchivo();
                     case "3" -> descargarArchivo();
+                    case "4" -> crearCarpeta();
+                    case "5" -> cambiarCarpeta();
+                    case "6" -> volverPadre();
                     case "0" -> continuar = false;
                     default -> System.out.println("Opción incorrecta.");
                 }
@@ -71,6 +77,26 @@ public class GestorFTP {
             }
         }
         System.out.println("Fin del Cliente FTP.");
+    }
+
+    private void volverPadre() {
+    }
+
+    private void cambiarCarpeta() {
+    }
+
+    private boolean crearCarpeta() throws IOException {
+        System.out.println("Nombre de la carpeta a crear: ");
+        if (!entrada.hasNextLine()) return false;
+        String nombreCarpeta = entrada.nextLine();
+        if (nombreCarpeta.isEmpty()) return false;
+
+        try {
+            
+            return ftpClient.makeDirectory(nombreCarpeta);
+        } catch (IOException e) {
+            throw new IOException("Error al subir el archivo: " + e.getMessage(), e);
+        }
     }
 
     private void listar() throws IOException {
@@ -144,8 +170,7 @@ public class GestorFTP {
     }
 
     private boolean descargarArchivo() throws IOException {
-
-
+        listar();
         System.out.println("Nombre en el servidor: ");
         if (!entrada.hasNextLine()) return false;
         String rutaRemota = entrada.nextLine();
@@ -164,6 +189,7 @@ public class GestorFTP {
         }
 
         try (OutputStream outputStream = new FileOutputStream(localFile)) {
+            System.out.println("Archivo bajado em "+localFile.getPath());
             return ftpClient.retrieveFile(rutaRemota, outputStream);
         } catch (IOException e) {
             throw new IOException(
