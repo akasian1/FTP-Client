@@ -1,0 +1,178 @@
+import com.sun.tools.javac.Main;
+import org.apache.commons.net.ftp.FTP;
+import org.apache.commons.net.ftp.FTPClient;
+import org.apache.commons.net.ftp.FTPFile;
+import org.apache.commons.net.ftp.FTPReply;
+
+import java.io.*;
+import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.InputMismatchException;
+import java.util.Scanner;
+
+public class GestorFTP {
+    private final Scanner entrada;
+    private final FTPClient ftpClient;
+    private static final String SERVER = "localhost";
+    private static final int PORT = 21;
+    private static final String USERNAME = Credenciales.USUARIO;
+    private static final String PASSWORD = Credenciales.CONTRASENA;
+
+    public GestorFTP(Scanner entrada) {
+        this.ftpClient = new FTPClient();
+        this.entrada = entrada;
+    }
+
+
+    public static void main(String[] argumentos) {
+        System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
+        try (Scanner entrada = new Scanner(System.in, StandardCharsets.UTF_8)) {
+            GestorFTP gestorFTP = new GestorFTP(entrada);
+            try {
+                gestorFTP.conectar();
+                System.out.println("Conectado al servidor FTP.");
+                gestorFTP.ejecutar();
+            } catch (IOException e) {
+                System.err.println("Error: " + e.getMessage());
+            } finally {
+                try {
+                    gestorFTP.desconectar();
+                    System.out.println("Desconectado del servidor FTP.");
+                } catch (IOException e) {
+                    System.err.println("Error al desconectar: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void ejecutar() {
+        boolean continuar = true;
+        while (continuar && !Thread.currentThread().isInterrupted()) {
+            System.out.println(
+                    "\n1. Listar archivos y carpetas." +
+                    "\n2. Subir un archivo." +
+                    "\n3. Descargar un archivo." +
+                    "\n0. Salir."
+            );
+            System.out.print("Opción: ");
+            if (!entrada.hasNextLine()) throw new InputMismatchException();
+            String opcion = entrada.nextLine();
+            if (opcion == null) break;
+            try {
+                switch (opcion.trim()) {
+                    case "1" -> listar("", 0);
+                    case "2" -> subirArchivo();
+                    case "3" -> descargarArchivo();
+                    case "0" -> continuar = false;
+                    default -> System.out.println("Opción incorrecta.");
+                }
+            } catch (Exception error) {
+                System.out.println(error.getMessage());
+                continuar = false;
+            }
+        }
+        System.out.println("Fin del Cliente FTP.");
+    }
+
+    private void listar(String ruta, int offset) throws IOException {
+        if (ruta.isEmpty()) {
+            System.out.println("Contenido del raiz :");
+            FTPFile[] dirs = ftpClient.listDirectories();
+            for (int i = 0; i < dirs.length; i++) {
+                if(dirs[i].isFile()) {
+                    System.out.println(dirs[i].getName());
+                } else if (dirs[i].isDirectory()) {
+                }
+            }
+        } else {
+            for (Object o : ftpClient.listDirectories(ruta)) {
+
+            }
+        }
+    }
+
+
+    public void conectar() throws SocketException, IOException {
+        ftpClient.connect(SERVER, PORT);
+        int replyCode = ftpClient.getReplyCode();
+        //220	Servidor listo para recibir al cliente
+        //230	Inicio de sesión correcto
+        //530	No se ha iniciado sesión o autenticación rechazada
+        //421	Servicio no disponible
+        if (!FTPReply.isPositiveCompletion(replyCode)) {
+            throw new IOException("No se pudo conectar al servidor FTP, " +
+                    "código de respuesta: " + replyCode);
+        }
+        boolean loggedIn = ftpClient.login(USERNAME, PASSWORD);
+        if (!loggedIn) {
+            throw new IOException("No se pudo iniciar sesión en el servidor FTP " +
+                    "con las credenciales proporcionadas.");
+        }
+        ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+    }
+
+    private void desconectar() throws IOException {
+        if (ftpClient.isConnected()) {
+            ftpClient.logout();
+            ftpClient.disconnect();
+        }
+    }
+
+    private boolean subirArchivo() throws IOException {
+        System.out.println("Introduce la ruta local de archivo: ");
+        if (!entrada.hasNextLine()) return false;
+        String rutaLocal = entrada.nextLine();
+        if (rutaLocal == null) return false;
+        
+        System.out.println("Introduce la ruta remota en el FTP de archivo: ");
+        if (!entrada.hasNextLine()) return false;
+        String rutaRemota = entrada.nextLine();
+        if (rutaRemota == null) return false;
+        
+        
+        try {
+            File localFile = new File(rutaLocal);
+            if (!localFile.exists() || !localFile.isFile()) {
+                throw new IOException("El archivo local no existe o no es un archivo válido: "
+                        + rutaLocal);
+            }
+            try (InputStream inputStream = new FileInputStream(localFile)) {
+                return ftpClient.storeFile(rutaRemota, inputStream);
+            }
+        } catch (IOException e) {
+            throw new IOException("Error al subir el archivo: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean descargarArchivo() throws IOException {
+        System.out.println("Introduce la ruta local de archivo: ");
+        if (!entrada.hasNextLine()) return false;
+        String rutaLocal = entrada.nextLine();
+        if (rutaLocal == null) return false;
+        
+        System.out.println("Introduce la ruta remota en el FTP de archivo: ");
+        if (!entrada.hasNextLine()) return false;
+        String rutaRemota = entrada.nextLine();
+        if (rutaRemota == null) return false;
+        
+        
+        File localFile = new File(rutaLocal);
+        File carpetaDestino = localFile.getAbsoluteFile().getParentFile();
+
+        if (carpetaDestino == null || !carpetaDestino.isDirectory()) {
+            throw new IOException("La carpeta de destino no existe.");
+        }
+
+        try (OutputStream outputStream = new FileOutputStream(localFile)) {
+            return ftpClient.retrieveFile(rutaRemota, outputStream);
+        } catch (IOException e) {
+            throw new IOException(
+                    "Error al descargar el archivo: " + e.getMessage(), e
+            );
+        }
+    }
+}
+
+
