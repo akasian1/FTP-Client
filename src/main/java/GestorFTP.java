@@ -1,4 +1,3 @@
-import com.sun.tools.javac.Main;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
@@ -7,8 +6,6 @@ import org.apache.commons.net.ftp.FTPReply;
 import java.io.*;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.InputMismatchException;
 import java.util.Scanner;
 
@@ -62,7 +59,7 @@ public class GestorFTP {
             if (opcion == null) break;
             try {
                 switch (opcion.trim()) {
-                    case "1" -> listar("", 0);
+                    case "1" -> listar();
                     case "2" -> subirArchivo();
                     case "3" -> descargarArchivo();
                     case "0" -> continuar = false;
@@ -76,19 +73,15 @@ public class GestorFTP {
         System.out.println("Fin del Cliente FTP.");
     }
 
-    private void listar(String ruta, int offset) throws IOException {
-        if (ruta.isEmpty()) {
-            System.out.println("Contenido del raiz :");
-            FTPFile[] dirs = ftpClient.listDirectories();
-            for (int i = 0; i < dirs.length; i++) {
-                if(dirs[i].isFile()) {
-                    System.out.println(dirs[i].getName());
-                } else if (dirs[i].isDirectory()) {
-                }
-            }
-        } else {
-            for (Object o : ftpClient.listDirectories(ruta)) {
-
+    private void listar() throws IOException {
+        System.out.println("Contenido del directorio actual :");
+        FTPFile[] dirs = ftpClient.listFiles();
+        if (dirs.length == 0) System.out.println("La carpeta esta vacia");
+        for (int i = 0; i < dirs.length; i++) {
+            if(dirs[i].isFile()) {
+                System.out.println("Archivo : "+dirs[i].getName() + " de tamaño "+ dirs[i].getSize() + " Bytes");
+            } else if (dirs[i].isDirectory()) {
+                System.out.println("Directorio : "+dirs[i].getName());
             }
         }
     }
@@ -121,24 +114,28 @@ public class GestorFTP {
     }
 
     private boolean subirArchivo() throws IOException {
-        System.out.println("Introduce la ruta local de archivo: ");
+        System.out.println("Ruta del archivo local: ");
         if (!entrada.hasNextLine()) return false;
         String rutaLocal = entrada.nextLine();
-        if (rutaLocal == null) return false;
-        
-        System.out.println("Introduce la ruta remota en el FTP de archivo: ");
+        if (rutaLocal.isEmpty()) return false;
+        File localFile = new File(rutaLocal);
+
+
+        System.out.println("Nombre en el servidor: ");
         if (!entrada.hasNextLine()) return false;
         String rutaRemota = entrada.nextLine();
-        if (rutaRemota == null) return false;
+        if (rutaRemota.isEmpty()) rutaRemota = localFile.getName();
+
         
         
         try {
-            File localFile = new File(rutaLocal);
+
             if (!localFile.exists() || !localFile.isFile()) {
                 throw new IOException("El archivo local no existe o no es un archivo válido: "
                         + rutaLocal);
             }
             try (InputStream inputStream = new FileInputStream(localFile)) {
+                System.out.println("Archivo subido a "+rutaRemota);
                 return ftpClient.storeFile(rutaRemota, inputStream);
             }
         } catch (IOException e) {
@@ -147,17 +144,18 @@ public class GestorFTP {
     }
 
     private boolean descargarArchivo() throws IOException {
-        System.out.println("Introduce la ruta local de archivo: ");
-        if (!entrada.hasNextLine()) return false;
-        String rutaLocal = entrada.nextLine();
-        if (rutaLocal == null) return false;
-        
-        System.out.println("Introduce la ruta remota en el FTP de archivo: ");
+
+
+        System.out.println("Nombre en el servidor: ");
         if (!entrada.hasNextLine()) return false;
         String rutaRemota = entrada.nextLine();
-        if (rutaRemota == null) return false;
-        
-        
+        if (rutaRemota.isEmpty()) return false;
+
+        System.out.println("Ruta del archivo local: ");
+        if (!entrada.hasNextLine()) return false;
+        String rutaLocal = entrada.nextLine();
+        if (rutaLocal.isEmpty()) rutaLocal = rutaRemota;
+
         File localFile = new File(rutaLocal);
         File carpetaDestino = localFile.getAbsoluteFile().getParentFile();
 
